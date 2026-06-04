@@ -13,6 +13,56 @@ import {
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
+const isJwtToken = (token) => token.split('.').length === 3;
+
+const getGooglePayloadFromIdToken = async (idToken) => {
+  const ticket = await googleClient.verifyIdToken({
+    idToken,
+    audience: process.env.GOOGLE_CLIENT_ID,
+  });
+
+  return ticket.getPayload();
+};
+
+const getGooglePayloadFromAuthCode = async (code) => {
+  if (!process.env.GOOGLE_CLIENT_SECRET) {
+    throw new AppError(
+      'GOOGLE_CLIENT_SECRET is required for Google code flow',
+      500,
+    );
+  }
+
+  const codeClient = new OAuth2Client(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET,
+    process.env.GOOGLE_REDIRECT_URI || 'postmessage',
+  );
+
+  const { tokens } = await codeClient.getToken(code);
+
+  if (!tokens.id_token) {
+    throw new AppError('Google did not return an ID token', 401);
+  }
+
+  return getGooglePayloadFromIdToken(tokens.id_token);
+};
+
+const getGooglePayload = async (token) => {
+  try {
+    if (isJwtToken(token)) {
+      return await getGooglePayloadFromIdToken(token);
+    }
+
+    return await getGooglePayloadFromAuthCode(token);
+  } catch (error) {
+    if (error instanceof AppError) {
+      throw error;
+    }
+
+    throw new AppError(error.message || 'Google authentication failed', 401);
+  }
+};
+
 const createOrReuseSession = async (userId) => {
   const now = new Date();
 
@@ -116,9 +166,10 @@ export const login = asyncHandler(async (req, res) => {
 });
 
 export const continueWithGoogle = asyncHandler(async (req, res) => {
-  const idToken = req.body.credential || req.body.idToken || req.body.token;
+  const googleToken =
+    req.body.credential || req.body.idToken || req.body.token || req.body.code;
 
-  if (!idToken) {
+  if (!googleToken) {
     throw new AppError('Google credential is required', 400);
   }
 
@@ -126,12 +177,7 @@ export const continueWithGoogle = asyncHandler(async (req, res) => {
     throw new AppError('GOOGLE_CLIENT_ID is not configured', 500);
   }
 
-  const ticket = await googleClient.verifyIdToken({
-    idToken,
-    audience: process.env.GOOGLE_CLIENT_ID,
-  });
-
-  const payload = ticket.getPayload();
+  const payload = await getGooglePayload(googleToken);
 
   if (!payload?.sub || !payload.email) {
     throw new AppError('Invalid Google credential payload', 401);
@@ -162,24 +208,14 @@ export const continueWithGoogle = asyncHandler(async (req, res) => {
       {
         $set: {
           avatar: payload.picture || user.avatar,
+          googleId: user.googleId || payload.sub,
           isEmailVerified: true,
           name: user.name || payload.name || normalizedEmail.split('@')[0],
           provider: user.provider === 'local' ? 'local' : 'google',
         },
-        $setOnInsert: {
-          googleId: payload.sub,
-        },
       },
       { new: true },
     );
-
-    if (!user.googleId) {
-      user = await Auth.findByIdAndUpdate(
-        user._id,
-        { googleId: payload.sub },
-        { new: true },
-      );
-    }
   }
 
   const session = await createOrReuseSession(user._id);

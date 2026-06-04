@@ -27,6 +27,8 @@ PORT=4000
 MONGO_URI=mongodb://127.0.0.1:27017/google-drive-clone
 FRONTEND_URL=http://localhost:3001
 GOOGLE_CLIENT_ID=your_google_web_client_id
+GOOGLE_CLIENT_SECRET=your_google_client_secret
+GOOGLE_REDIRECT_URI=postmessage
 ```
 
 Start the server:
@@ -131,6 +133,8 @@ or:
 ```
 
 The backend verifies the token with Google using `GOOGLE_CLIENT_ID`, checks that the Google email is verified, creates or updates the user, then creates or reuses a session.
+
+If the frontend sends a Google auth code that starts with `4/`, the backend exchanges it for an ID token first. In that case `GOOGLE_CLIENT_SECRET` is required. If the frontend sends a Google ID token, it will usually look like a JWT with three dot-separated parts.
 
 ### Current User
 
