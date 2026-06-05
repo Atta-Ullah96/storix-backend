@@ -1,95 +1,13 @@
 import bcrypt from 'bcrypt';
-import { OAuth2Client } from 'google-auth-library';
-import mongoose from 'mongoose';
 import Auth from '../models/auth.js';
-import Session from '../models/session.js';
 import { AppError, asyncHandler } from '../middleware/error.js';
+import { verifyGoogleCredential } from '../services/googleAuth.js';
+import { createOrReuseSession, deleteSessionById } from '../services/session.js';
 import {
   clearSessionCookie,
-  getSessionExpiryDate,
   getSessionIdFromRequest,
   setSessionCookie,
 } from '../utils/session.js';
-
-const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
-
-const isJwtToken = (token) => token.split('.').length === 3;
-
-const getGooglePayloadFromIdToken = async (idToken) => {
-  const ticket = await googleClient.verifyIdToken({
-    idToken,
-    audience: process.env.GOOGLE_CLIENT_ID,
-  });
-
-  return ticket.getPayload();
-};
-
-const getGooglePayloadFromAuthCode = async (code) => {
-  if (!process.env.GOOGLE_CLIENT_SECRET) {
-    throw new AppError(
-      'GOOGLE_CLIENT_SECRET is required for Google code flow',
-      500,
-    );
-  }
-
-  const codeClient = new OAuth2Client(
-    process.env.GOOGLE_CLIENT_ID,
-    process.env.GOOGLE_CLIENT_SECRET,
-    process.env.GOOGLE_REDIRECT_URI || 'postmessage',
-  );
-
-  const { tokens } = await codeClient.getToken(code);
-
-  if (!tokens.id_token) {
-    throw new AppError('Google did not return an ID token', 401);
-  }
-
-  return getGooglePayloadFromIdToken(tokens.id_token);
-};
-
-const getGooglePayload = async (token) => {
-  try {
-    if (isJwtToken(token)) {
-      return await getGooglePayloadFromIdToken(token);
-    }
-
-    return await getGooglePayloadFromAuthCode(token);
-  } catch (error) {
-    if (error instanceof AppError) {
-      throw error;
-    }
-
-    throw new AppError(error.message || 'Google authentication failed', 401);
-  }
-};
-
-const createOrReuseSession = async (userId) => {
-  const now = new Date();
-
-  await Session.deleteMany({
-    user: userId,
-    expiresAt: { $lte: now },
-  });
-
-  let session = await Session.findOne({
-    user: userId,
-    expiresAt: { $gt: now },
-  }).sort({ createdAt: -1 });
-
-  if (!session) {
-    session = await Session.create({
-      user: userId,
-      expiresAt: getSessionExpiryDate(),
-    });
-  }
-
-  await Session.deleteMany({
-    user: userId,
-    _id: { $ne: session._id },
-  });
-
-  return session;
-};
 
 export const register = asyncHandler(async (req, res) => {
   const { name, email, password } = req.body;
@@ -173,33 +91,19 @@ export const continueWithGoogle = asyncHandler(async (req, res) => {
     throw new AppError('Google credential is required', 400);
   }
 
-  if (!process.env.GOOGLE_CLIENT_ID) {
-    throw new AppError('GOOGLE_CLIENT_ID is not configured', 500);
-  }
-
-  const payload = await getGooglePayload(googleToken);
-
-  if (!payload?.sub || !payload.email) {
-    throw new AppError('Invalid Google credential payload', 401);
-  }
-
-  if (!payload.email_verified) {
-    throw new AppError('Google email is not verified', 401);
-  }
-
-  const normalizedEmail = payload.email.toLowerCase().trim();
+  const googleUser = await verifyGoogleCredential(googleToken);
 
   let user = await Auth.findOne({
-    $or: [{ googleId: payload.sub }, { email: normalizedEmail }],
+    $or: [{ googleId: googleUser.googleId }, { email: googleUser.email }],
   });
 
   if (!user) {
     user = await Auth.create({
-      name: payload.name || normalizedEmail.split('@')[0],
-      email: normalizedEmail,
+      name: googleUser.name,
+      email: googleUser.email,
       provider: 'google',
-      googleId: payload.sub,
-      avatar: payload.picture || null,
+      googleId: googleUser.googleId,
+      avatar: googleUser.avatar,
       isEmailVerified: true,
     });
   } else {
@@ -207,10 +111,10 @@ export const continueWithGoogle = asyncHandler(async (req, res) => {
       user._id,
       {
         $set: {
-          avatar: payload.picture || user.avatar,
-          googleId: user.googleId || payload.sub,
+          avatar: googleUser.avatar || user.avatar,
+          googleId: user.googleId || googleUser.googleId,
           isEmailVerified: true,
-          name: user.name || payload.name || normalizedEmail.split('@')[0],
+          name: user.name || googleUser.name,
           provider: user.provider === 'local' ? 'local' : 'google',
         },
       },
@@ -237,9 +141,7 @@ export const continueWithGoogle = asyncHandler(async (req, res) => {
 export const logout = asyncHandler(async (req, res) => {
   const sessionId = req.session?._id || getSessionIdFromRequest(req);
 
-  if (sessionId && mongoose.isValidObjectId(sessionId)) {
-    await Session.findByIdAndDelete(sessionId);
-  }
+  await deleteSessionById(sessionId);
 
   clearSessionCookie(res);
 

@@ -51,11 +51,16 @@ backend/
   index.js               DB connection and server startup
   config/db.js           MongoDB connection
   controller/auth.js     Auth controllers
+  controller/folder.js   Folder controllers
   middleware/auth.js     Session authentication middleware
   middleware/error.js    AppError, asyncHandler, error handler
   models/auth.js         User/auth model
+  models/folder.js       Folder model
   models/session.js      Session model
   routes/auth.js         Auth routes
+  routes/folder.js       Folder routes
+  services/googleAuth.js Google credential verification
+  services/session.js    Session create/reuse/delete logic
   utils/session.js       Session cookie helpers
 ```
 
@@ -151,6 +156,41 @@ POST /api/v1/auth/logout
 ```
 
 Requires a valid session. Deletes the session from MongoDB and clears the cookie.
+
+## Folder Routes
+
+Base path:
+
+```text
+/api/v1/folder
+```
+
+### Create Folder
+
+```http
+POST /api/v1/folder
+```
+
+Requires a valid session.
+
+Body for a root folder:
+
+```json
+{
+  "name": "Documents"
+}
+```
+
+Body for a nested folder:
+
+```json
+{
+  "name": "Projects",
+  "parentFolder": "parent_folder_id_here"
+}
+```
+
+If `parentFolder` is missing, the folder is created at the root level.
 
 ## Session Behavior
 
