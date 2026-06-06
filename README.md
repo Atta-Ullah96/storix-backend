@@ -168,7 +168,7 @@ Base path:
 ### Create Folder
 
 ```http
-POST /api/v1/folder
+POST /api/v1/folder/create
 ```
 
 Requires a valid session.
@@ -191,6 +191,46 @@ Body for a nested folder:
 ```
 
 If `parentFolder` is missing, the folder is created at the root level.
+
+### Get Folders
+
+```http
+GET /api/v1/folder
+```
+
+Requires a valid session. Returns root folders for the current user.
+
+To get folders inside another folder:
+
+```http
+GET /api/v1/folder?parentFolder=parent_folder_id_here
+```
+
+### Rename Folder
+
+```http
+PATCH /api/v1/folder/:folderId/rename
+```
+
+Requires a valid session.
+
+Body:
+
+```json
+{
+  "name": "New Folder Name"
+}
+```
+
+### Delete Folder
+
+```http
+DELETE /api/v1/folder/:folderId
+```
+
+Requires a valid session. This deletes the selected folder and all nested child folders owned by the current user.
+
+When file support is added, file cleanup should be handled from `services/folder.js` so deleting a folder also deletes or moves the files inside it according to the app policy.
 
 ## Session Behavior
 
