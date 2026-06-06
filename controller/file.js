@@ -184,6 +184,39 @@ export const getFiles = asyncHandler(async (req, res) => {
   });
 });
 
+export const downloadFile = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { redirect } = req.query;
+
+  const file = await findUserFile({
+    fileId: id,
+    userId: req.user._id,
+    status: 'completed',
+    isTrashed: false,
+  });
+
+  const downloadUrl = file.url || getCloudFrontUrl(file.storageKey);
+
+  if (!downloadUrl) {
+    throw new AppError('File download URL is not available', 500);
+  }
+
+  if (redirect === 'true') {
+    return res.redirect(downloadUrl);
+  }
+
+  return res.status(200).json({
+    success: true,
+    file: {
+      id: file._id,
+      name: file.name,
+      mimeType: file.mimeType,
+      size: file.size,
+      downloadUrl,
+    },
+  });
+});
+
 export const renameFile = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { name } = req.body;
