@@ -4,6 +4,7 @@ import {
   deleteFile,
   downloadFile,
   getFiles,
+  previewFile,
   renameFile,
   requestUpload,
 } from '../controller/file.js';
@@ -12,6 +13,7 @@ import { requireAuth } from '../middleware/auth.js';
 const router = express.Router();
 
 router.get('/', requireAuth, getFiles);
+router.get('/:id/preview' , requireAuth , previewFile)
 router.post('/request-upload', requireAuth, requestUpload);
 router.post('/complete-upload', requireAuth, completeUpload);
 router.get('/:id/download', requireAuth, downloadFile);

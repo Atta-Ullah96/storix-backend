@@ -1,7 +1,9 @@
 import File from '../models/file.js';
-import Folder from '../models/folder.js';
 import { AppError, asyncHandler } from '../middleware/error.js';
+import { validateFolderAccess } from '../utils/folder.js';
 import {
+
+  createFileAccessUrl,
   createUploadUrl,
   deleteS3Object,
   getCloudFrontUrl,
@@ -10,59 +12,13 @@ import {
 } from '../services/s3.js';
 import {
   createStorageKey,
+  findUserFile,
+  formatFileResponse,
   getFileExtension,
   isAllowedFileType,
   isValidFileSize,
 } from '../utils/file.js';
 
-const findUserFile = async ({ fileId, userId, status, isTrashed }) => {
-  const query = {
-    _id: fileId,
-    owner: userId,
-  };
-
-  if (status) {
-    query.status = status;
-  }
-
-  if (typeof isTrashed === 'boolean') {
-    query.isTrashed = isTrashed;
-  }
-
-  const file = await File.findOne(query);
-
-  if (!file) {
-    throw new AppError('File not found', 404);
-  }
-
-  return file;
-};
-
-const validateFolderAccess = async ({ folderId, userId }) => {
-  if (!folderId) {
-    return null;
-  }
-
-  const folder = await Folder.findOne({
-    _id: folderId,
-    user: userId,
-  });
-
-  if (!folder) {
-    throw new AppError('Folder not found', 404);
-  }
-
-  return folder._id;
-};
-
-const formatFileResponse = (file) => {
-  const fileObject = file.toObject();
-
-  return {
-    ...fileObject,
-    url: fileObject.url || getCloudFrontUrl(fileObject.storageKey),
-  };
-};
 
 export const requestUpload = asyncHandler(async (req, res) => {
   const { fileName, fileType, fileSize, folderId } = req.body;
@@ -195,11 +151,12 @@ export const downloadFile = asyncHandler(async (req, res) => {
     isTrashed: false,
   });
 
-  const downloadUrl = file.url || getCloudFrontUrl(file.storageKey);
+ const downloadUrl = await createFileAccessUrl({
+  storageKey: file.storageKey,
+  fileName: file.name,
+  mimeType: file.mimeType,
+});
 
-  if (!downloadUrl) {
-    throw new AppError('File download URL is not available', 500);
-  }
 
   if (redirect === 'true') {
     return res.redirect(downloadUrl);
@@ -213,6 +170,41 @@ export const downloadFile = asyncHandler(async (req, res) => {
       mimeType: file.mimeType,
       size: file.size,
       downloadUrl,
+    },
+  });
+});
+
+
+export const previewFile = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { redirect } = req.query;
+
+  const file = await findUserFile({
+    fileId: id,
+    userId: req.user._id,
+    status: "completed",
+    isTrashed: false,
+  });
+
+  const previewUrl = await createFileAccessUrl({
+    storageKey: file.storageKey,
+    fileName: file.name,
+    mimeType: file.mimeType,
+    disposition:"inline"
+  });
+
+  if (redirect === "true") {
+    return res.redirect(previewUrl);
+  }
+
+  return res.status(200).json({
+    success: true,
+    file: {
+      id: file._id,
+      name: file.name,
+      mimeType: file.mimeType,
+      size: file.size,
+      previewUrl,
     },
   });
 });
@@ -261,3 +253,5 @@ export const deleteFile = asyncHandler(async (req, res) => {
     message: 'File deleted successfully',
   });
 });
+
+

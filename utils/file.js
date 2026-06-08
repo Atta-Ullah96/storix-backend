@@ -1,5 +1,8 @@
 import crypto from 'crypto';
 import path from 'path';
+import File from '../models/file.js';
+import { AppError } from '../middleware/error.js';
+import { getCloudFrontUrl } from '../services/s3.js';
 
 export const ALLOWED_FILE_TYPES = [
   'image/png',
@@ -40,3 +43,35 @@ export const isAllowedFileType = (fileType) =>
   ALLOWED_FILE_TYPES.includes(fileType);
 
 export const isValidFileSize = (fileSize) => Number(fileSize) <= MAX_FILE_SIZE;
+
+export const findUserFile = async ({ fileId, userId, status, isTrashed }) => {
+  const query = {
+    _id: fileId,
+    owner: userId,
+  };
+
+  if (status) {
+    query.status = status;
+  }
+
+  if (typeof isTrashed === 'boolean') {
+    query.isTrashed = isTrashed;
+  }
+
+  const file = await File.findOne(query);
+
+  if (!file) {
+    throw new AppError('File not found', 404);
+  }
+
+  return file;
+};
+
+export const formatFileResponse = (file) => {
+  const fileObject = file.toObject();
+
+  return {
+    ...fileObject,
+    url: fileObject.url || getCloudFrontUrl(fileObject.storageKey),
+  };
+};

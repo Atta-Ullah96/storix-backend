@@ -1,5 +1,6 @@
 import {
   DeleteObjectCommand,
+  GetObjectCommand,
   HeadObjectCommand,
   PutObjectCommand,
   S3Client,
@@ -50,6 +51,25 @@ export const createUploadUrl = async ({ storageKey, fileType }) => {
 
   return getSignedUrl(createS3Client(), command, {
     expiresIn: 300,
+  });
+};
+
+export const createFileAccessUrl = async ({
+  storageKey,
+  fileName,
+  mimeType,
+  disposition = "attachment",
+  expiresIn = 300,
+}) => {
+  const command = new GetObjectCommand({
+    Bucket: getS3Bucket(),
+    Key: storageKey,
+    ResponseContentType: mimeType || "application/octet-stream",
+    ResponseContentDisposition: `${disposition}; filename="${fileName}"`,
+  });
+
+  return getSignedUrl(createS3Client(), command, {
+    expiresIn,
   });
 };
 
