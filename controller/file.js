@@ -18,6 +18,7 @@ import {
   isAllowedFileType,
   isValidFileSize,
 } from '../utils/file.js';
+import {  getCloudFrontFileUrl, invalidateCloudFrontPath } from '../services/cloudFront.js';
 
 
 export const requestUpload = asyncHandler(async (req, res) => {
@@ -186,12 +187,7 @@ export const previewFile = asyncHandler(async (req, res) => {
     isTrashed: false,
   });
 
-  const previewUrl = await createFileAccessUrl({
-    storageKey: file.storageKey,
-    fileName: file.name,
-    mimeType: file.mimeType,
-    disposition:"inline"
-  });
+  const previewUrl = getCloudFrontFileUrl(file?.storageKey);
 
   if (redirect === "true") {
     return res.redirect(previewUrl);
@@ -247,6 +243,9 @@ export const deleteFile = asyncHandler(async (req, res) => {
     _id: file._id,
     owner: req.user._id,
   });
+   invalidateCloudFrontPath(file?.storageKey).catch((error) => {
+      console.error("CloudFront invalidation failed:", error);
+    });
 
   res.status(200).json({
     success: true,
