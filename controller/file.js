@@ -2,7 +2,6 @@ import File from '../models/file.js';
 import { AppError, asyncHandler } from '../middleware/error.js';
 import { validateFolderAccess } from '../utils/folder.js';
 import {
-
   createFileAccessUrl,
   createUploadUrl,
   deleteS3Object,
@@ -18,9 +17,13 @@ import {
   isAllowedFileType,
   isValidFileSize,
 } from '../utils/file.js';
-import {  getCloudFrontFileUrl, invalidateCloudFrontPath } from '../services/cloudFront.js';
+import {
+  getCloudFrontFileUrl,
+  invalidateCloudFrontPath,
+} from '../services/cloudFront.js';
+import Auth from '../models/auth.js';
 
-
+const EIGHT_GB = 8 * 1024 * 1024 * 1024;
 export const requestUpload = asyncHandler(async (req, res) => {
   const { fileName, fileType, fileSize, folderId } = req.body;
 
@@ -35,7 +38,42 @@ export const requestUpload = asyncHandler(async (req, res) => {
   if (!isValidFileSize(fileSize)) {
     throw new AppError('File size is too large', 400);
   }
+  const size = Number(fileSize);
 
+  if (!Number.isFinite(size) || size <= 0) {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid file size.',
+    });
+  }
+
+  const user = await Auth.findById(req.user.id).select(
+    'storageUsed storageLimit'
+  );
+
+  if (!user) {
+    return res.status(404).json({
+      success: false,
+      message: 'User not found.',
+    });
+  }
+
+  const storageUsed = user.storageUsed || 0;
+  const storageLimit = user.storageLimit || EIGHT_GB;
+  const remainingStorage = storageLimit - storageUsed;
+
+  if (size > remainingStorage) {
+    return res.status(403).json({
+      success: false,
+      message: 'Storage limit exceeded. You only have 8GB storage.',
+      storage: {
+        used: storageUsed,
+        limit: storageLimit,
+        remaining: Math.max(remainingStorage, 0),
+        requested: size,
+      },
+    });
+  }
   const parentFolderId = await validateFolderAccess({
     folderId,
     userId: req.user._id,
@@ -107,11 +145,29 @@ export const completeUpload = asyncHandler(async (req, res) => {
     throw new AppError('Uploaded file size does not match', 400);
   }
 
+  const user = await Auth.findById(req.user.id).select(
+    'storageUsed storageLimit'
+  );
+
+  const storageUsed = user.storageUsed || 0;
+  const storageLimit = user.storageLimit || 8 * 1024 * 1024 * 1024;
+  const newStorageUsed = storageUsed + file.size;
+
+  if (newStorageUsed > storageLimit) {
+    return res.status(403).json({
+      success: false,
+      message: 'Storage limit exceeded.',
+    });
+  }
+
   file.status = 'completed';
   file.url = getCloudFrontUrl(file.storageKey);
   file.uploadedAt = new Date();
 
   await file.save();
+
+  user.storageUsed = newStorageUsed;
+  await user.save();
 
   res.status(200).json({
     success: true,
@@ -152,12 +208,11 @@ export const downloadFile = asyncHandler(async (req, res) => {
     isTrashed: false,
   });
 
- const downloadUrl = await createFileAccessUrl({
-  storageKey: file.storageKey,
-  fileName: file.name,
-  mimeType: file.mimeType,
-});
-
+  const downloadUrl = await createFileAccessUrl({
+    storageKey: file.storageKey,
+    fileName: file.name,
+    mimeType: file.mimeType,
+  });
 
   if (redirect === 'true') {
     return res.redirect(downloadUrl);
@@ -175,7 +230,6 @@ export const downloadFile = asyncHandler(async (req, res) => {
   });
 });
 
-
 export const previewFile = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { redirect } = req.query;
@@ -183,13 +237,13 @@ export const previewFile = asyncHandler(async (req, res) => {
   const file = await findUserFile({
     fileId: id,
     userId: req.user._id,
-    status: "completed",
+    status: 'completed',
     isTrashed: false,
   });
 
   const previewUrl = getCloudFrontFileUrl(file?.storageKey);
 
-  if (redirect === "true") {
+  if (redirect === 'true') {
     return res.redirect(previewUrl);
   }
 
@@ -243,14 +297,20 @@ export const deleteFile = asyncHandler(async (req, res) => {
     _id: file._id,
     owner: req.user._id,
   });
-   invalidateCloudFrontPath(file?.storageKey).catch((error) => {
-      console.error("CloudFront invalidation failed:", error);
-    });
+
+     if (file.status === "completed") {
+      const user = await Auth.findById(req.user.id).select("storageUsed");
+
+      user.storageUsed = Math.max((user.storageUsed || 0) - file.size, 0);
+
+      await user.save();
+    }
+  invalidateCloudFrontPath(file?.storageKey).catch((error) => {
+    console.error('CloudFront invalidation failed:', error);
+  });
 
   res.status(200).json({
     success: true,
     message: 'File deleted successfully',
   });
 });
-
-

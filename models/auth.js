@@ -39,6 +39,15 @@ const authSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    storageUsed: {
+      type: Number,
+      default: 0,
+    },
+
+    storageLimit: {
+      type: Number,
+      default: 8 * 1024 * 1024 * 1024,
+    },
   },
   {
     timestamps: true,
