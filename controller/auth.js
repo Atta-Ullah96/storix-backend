@@ -2,12 +2,16 @@ import bcrypt from 'bcrypt';
 import Auth from '../models/auth.js';
 import { AppError, asyncHandler } from '../middleware/error.js';
 import { verifyGoogleCredential } from '../services/googleAuth.js';
-import { createOrReuseSession, deleteSessionById } from '../services/session.js';
+import {
+  createOrReuseSession,
+  deleteSessionById,
+} from '../services/session.js';
 import {
   clearSessionCookie,
   getSessionIdFromRequest,
   setSessionCookie,
 } from '../utils/session.js';
+import { loginSchema } from '../validator/auth.js';
 
 export const register = asyncHandler(async (req, res) => {
   const { name, email, password } = req.body;
@@ -44,8 +48,10 @@ export const register = asyncHandler(async (req, res) => {
 });
 
 export const login = asyncHandler(async (req, res) => {
-  const { email, password } = req.body;
+  const validateData = loginSchema.parse(req.body);
 
+  const { email, password } = validateData;
+  
   if (!email || !password) {
     throw new AppError('Email and password are required', 400);
   }
@@ -118,7 +124,7 @@ export const continueWithGoogle = asyncHandler(async (req, res) => {
           provider: user.provider === 'local' ? 'local' : 'google',
         },
       },
-      { new: true },
+      { new: true }
     );
   }
 

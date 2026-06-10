@@ -1,16 +1,17 @@
-import mongoose from 'mongoose';
 import Folder from '../models/folder.js';
 import { AppError, asyncHandler } from '../middleware/error.js';
 import { deleteFolderTree } from '../services/folder.js';
+import { createFolderSchema } from '../validator/folder.js';
+import { isValidMongoId } from '../utils/isValidMongodbId.js';
 
 export const createFolder = asyncHandler(async (req, res) => {
-  const { name, parentFolder = null } = req.body;
+  const { name, parentFolder = null } = createFolderSchema(req.body);
 
   if (!name?.trim()) {
     throw new AppError('Folder name is required', 400);
   }
 
-  if (parentFolder && !mongoose.isValidObjectId(parentFolder)) {
+  if (parentFolder && !isValidMongoId(parentFolder)) {
     throw new AppError('Invalid parent folder id', 400);
   }
 
@@ -53,7 +54,7 @@ export const getFolders = asyncHandler(async (req, res) => {
   let folderParent = null;
 
   if (parentFolder) {
-    if (!mongoose.isValidObjectId(parentFolder)) {
+    if (!isValidMongoId(parentFolder)) {
       throw new AppError('Invalid parent folder id', 400);
     }
 
@@ -85,7 +86,7 @@ export const renameFolder = asyncHandler(async (req, res) => {
   const { folderId } = req.params;
   const { name } = req.body;
 
-  if (!mongoose.isValidObjectId(folderId)) {
+  if (!isValidMongoId(folderId)) {
     throw new AppError('Invalid folder id', 400);
   }
 
@@ -126,7 +127,7 @@ export const renameFolder = asyncHandler(async (req, res) => {
 export const deleteFolder = asyncHandler(async (req, res) => {
   const { folderId } = req.params;
 
-  if (!mongoose.isValidObjectId(folderId)) {
+  if (!isValidMongoId(folderId)) {
     throw new AppError('Invalid folder id', 400);
   }
 

@@ -6,6 +6,7 @@ import fileRoutes from './routes/file.js';
 import folderRoutes from './routes/folder.js';
 import UserRoutes from './routes/user.js'
 import { errorHandler, notFoundHandler } from './middleware/error.js';
+import helmet from 'helmet';
 
 const app = express();
 
@@ -17,6 +18,7 @@ app.use(
 );
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(helmet())
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/folder', folderRoutes);
 app.use('/api/v1/file', fileRoutes);

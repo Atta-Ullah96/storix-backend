@@ -22,10 +22,16 @@ import {
   invalidateCloudFrontPath,
 } from '../services/cloudFront.js';
 import Auth from '../models/auth.js';
+import { uploadFileSchema } from '../validator/file.js';
+import { isValidMongoId } from '../utils/isValidMongodbId.js';
 
 const EIGHT_GB = 8 * 1024 * 1024 * 1024;
 export const requestUpload = asyncHandler(async (req, res) => {
-  const { fileName, fileType, fileSize, folderId } = req.body;
+  const { fileName, fileType, fileSize, folderId } = uploadFileSchema(req.body);
+
+    if (!isValidMongoId(folderId)) {
+        throw new AppError('Invalid parent folder id', 400);
+      }
 
   if (!fileName || !fileType || !fileSize) {
     throw new AppError('File name, type and size are required', 400);
@@ -117,6 +123,10 @@ export const requestUpload = asyncHandler(async (req, res) => {
 export const completeUpload = asyncHandler(async (req, res) => {
   const { fileId } = req.body;
 
+  if (!isValidMongoId(fileId)) {
+      throw new AppError('Invalid file id', 400);
+    }
+
   if (!fileId) {
     throw new AppError('File ID is required', 400);
   }
@@ -178,6 +188,11 @@ export const completeUpload = asyncHandler(async (req, res) => {
 
 export const getFiles = asyncHandler(async (req, res) => {
   const { folderId } = req.query;
+
+    if (!isValidMongoId(folderId)) {
+      throw new AppError('Invalid parent folder id', 400);
+    }
+
   const parentFolderId = await validateFolderAccess({
     folderId,
     userId: req.user._id,
@@ -199,6 +214,11 @@ export const getFiles = asyncHandler(async (req, res) => {
 
 export const downloadFile = asyncHandler(async (req, res) => {
   const { id } = req.params;
+
+    if (!isValidMongoId(id)) {
+      throw new AppError('Invalid id', 400);
+    }
+
   const { redirect } = req.query;
 
   const file = await findUserFile({
@@ -232,6 +252,9 @@ export const downloadFile = asyncHandler(async (req, res) => {
 
 export const previewFile = asyncHandler(async (req, res) => {
   const { id } = req.params;
+    if (!isValidMongoId(id)) {
+      throw new AppError('Invalid  id', 400);
+    }
   const { redirect } = req.query;
 
   const file = await findUserFile({
@@ -261,6 +284,9 @@ export const previewFile = asyncHandler(async (req, res) => {
 
 export const renameFile = asyncHandler(async (req, res) => {
   const { id } = req.params;
+    if (!isValidMongoId(id)) {
+      throw new AppError('Invalid  id', 400);
+    }
   const { name } = req.body;
 
   if (!name?.trim()) {
@@ -285,6 +311,9 @@ export const renameFile = asyncHandler(async (req, res) => {
 
 export const deleteFile = asyncHandler(async (req, res) => {
   const { id } = req.params;
+    if (!isValidMongoId(id)) {
+      throw new AppError('Invalid  id', 400);
+    }
 
   const file = await findUserFile({
     fileId: id,
