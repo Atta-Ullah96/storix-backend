@@ -16,6 +16,7 @@ import {
   getFileExtension,
   isAllowedFileType,
   isValidFileSize,
+  PREVIEW_ALLOWED_TYPES,
 } from '../utils/file.js';
 import {
   getCloudFrontFileUrl,
@@ -264,6 +265,10 @@ export const previewFile = asyncHandler(async (req, res) => {
     status: 'completed',
     isTrashed: false,
   });
+
+  if(!PREVIEW_ALLOWED_TYPES.includes(file.mimeType)){
+    throw new AppError("Preview is not available for this file type" , 400)
+  }
 
   const previewUrl = getCloudFrontFileUrl(file?.storageKey);
 

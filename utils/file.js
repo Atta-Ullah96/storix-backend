@@ -75,3 +75,12 @@ export const formatFileResponse = (file) => {
     url: fileObject.url || getCloudFrontUrl(fileObject.storageKey),
   };
 };
+
+
+export const PREVIEW_ALLOWED_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "application/pdf",
+  "text/plain",
+];
