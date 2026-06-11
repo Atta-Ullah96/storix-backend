@@ -23,13 +23,13 @@ import {
 } from '../services/cloudFront.js';
 import Auth from '../models/auth.js';
 import { uploadFileSchema } from '../validator/file.js';
-import { isValidMongoId } from '../utils/isValidMongodbId.js';
+import { isValidMongoId, isValidOptionalMongoId } from '../utils/isValidMongodbId.js';
 
 const EIGHT_GB = 8 * 1024 * 1024 * 1024;
 export const requestUpload = asyncHandler(async (req, res) => {
-  const { fileName, fileType, fileSize, folderId } = uploadFileSchema(req.body);
+  const { fileName, fileType, fileSize, folderId } = uploadFileSchema.parse(req.body);
 
-    if (!isValidMongoId(folderId)) {
+    if (!isValidOptionalMongoId(folderId)) {
         throw new AppError('Invalid parent folder id', 400);
       }
 
@@ -188,9 +188,10 @@ export const completeUpload = asyncHandler(async (req, res) => {
 
 export const getFiles = asyncHandler(async (req, res) => {
   const { folderId } = req.query;
+console.log(folderId);
 
-    if (!isValidMongoId(folderId)) {
-      throw new AppError('Invalid parent folder id', 400);
+    if (!isValidOptionalMongoId(folderId)) {
+      throw new AppError('Invalid parent folders id', 400);
     }
 
   const parentFolderId = await validateFolderAccess({

@@ -5,7 +5,7 @@ import { createFolderSchema } from '../validator/folder.js';
 import { isValidMongoId } from '../utils/isValidMongodbId.js';
 
 export const createFolder = asyncHandler(async (req, res) => {
-  const { name, parentFolder = null } = createFolderSchema(req.body);
+  const { name, parentFolder = null } = createFolderSchema.parse(req.body);
 
   if (!name?.trim()) {
     throw new AppError('Folder name is required', 400);
