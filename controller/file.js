@@ -189,7 +189,6 @@ export const completeUpload = asyncHandler(async (req, res) => {
 
 export const getFiles = asyncHandler(async (req, res) => {
   const { folderId } = req.query;
-console.log(folderId);
 
     if (!isValidOptionalMongoId(folderId)) {
       throw new AppError('Invalid parent folders id', 400);

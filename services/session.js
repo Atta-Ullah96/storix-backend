@@ -1,39 +1,48 @@
-import mongoose from 'mongoose';
-import Session from '../models/session.js';
-import { getSessionExpiryDate } from '../utils/session.js';
+import { redisClient } from '../config/redis.js';
+
+const SESSION_PREFIX = "storix:session:";
+
+const SESSION_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days
 
 export const createOrReuseSession = async (userId) => {
-  const now = new Date();
+   const sessionId = crypto.randomUUID();
 
-  await Session.deleteMany({
-    user: userId,
-    expiresAt: { $lte: now },
-  });
+  const sessionKey = `${SESSION_PREFIX}${sessionId}`;
 
-  let session = await Session.findOne({
-    user: userId,
-    expiresAt: { $gt: now },
-  }).sort({ createdAt: -1 });
+
+
+
+  let session = await redisClient.json.get(sessionKey)
 
   if (!session) {
-    session = await Session.create({
-      user: userId,
-      expiresAt: getSessionExpiryDate(),
-    });
+    session = await redisClient.json.set(sessionKey , "$" ,{user: userId});
+    await redisClient.expire(sessionKey, SESSION_TTL_SECONDS);
   }
 
-  await Session.deleteMany({
-    user: userId,
-    _id: { $ne: session._id },
-  });
+
 
   return session;
 };
 
-export const deleteSessionById = async (sessionId) => {
-  if (!sessionId || !mongoose.isValidObjectId(sessionId)) {
+
+export const getSession = async (sessionId) => {
+  if (!sessionId) {
     return null;
   }
 
-  return Session.findByIdAndDelete(sessionId);
+  const sessionKey = `${SESSION_PREFIX}${sessionId}`;
+
+  const session = await redisClient.json.get(sessionKey);
+
+  return session || null;
+};
+
+export const deleteSessionById = async (sessionId) => {
+  if (!sessionId) {
+    return null;
+  }
+
+  const sessionKey = `${SESSION_PREFIX}${sessionId}`;
+
+  return redisClient.del(sessionKey);
 };
