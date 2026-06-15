@@ -1,6 +1,9 @@
-import mongoose from 'mongoose';
-import Session from '../models/session.js';
-import { clearSessionCookie, getSessionIdFromRequest } from '../utils/session.js';
+import Auth from '../models/auth.js';
+import { getSession } from '../services/session.js';
+import {
+  clearSessionCookie,
+  getSessionIdFromRequest,
+} from '../utils/cookiesHandling.js';
 import { AppError, asyncHandler } from './error.js';
 
 export const requireAuth = asyncHandler(async (req, res, next) => {
@@ -10,35 +13,27 @@ export const requireAuth = asyncHandler(async (req, res, next) => {
     throw new AppError('Authentication required', 401);
   }
 
-  if (!mongoose.isValidObjectId(sessionId)) {
-    clearSessionCookie(res);
-    throw new AppError('Invalid session', 401);
-  }
+  const session = await getSession(sessionId);
 
-  const session = await Session.findById(sessionId).populate(
-    'user',
-    'name email avatar provider',
-  );
-
-  if (!session) {
+  if (!session?.userId) {
     clearSessionCookie(res);
     throw new AppError('Session not found', 401);
   }
 
-  if (session.expiresAt <= new Date()) {
-    await Session.findByIdAndDelete(session._id);
-    clearSessionCookie(res);
-    throw new AppError('Session expired', 401);
-  }
+  const user = await Auth.findById(session.userId).select(
+    'name email avatar provider storageUsed storageLimit',
+  );
 
-  if (!session.user) {
-    await Session.findByIdAndDelete(session._id);
+  if (!user) {
     clearSessionCookie(res);
     throw new AppError('Session user not found', 401);
   }
 
-  req.session = session;
-  req.user = session.user;
+  req.session = {
+    id: sessionId,
+    ...session,
+  };
+  req.user = user;
 
   next();
 });

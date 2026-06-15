@@ -8,19 +8,27 @@ import UserRoutes from './routes/user.js'
 import { errorHandler, notFoundHandler } from './middleware/error.js';
 import helmet from 'helmet';
 import { globalLimiter } from './middleware/rateLimitter.js';
+import cookieParser from "cookie-parser";
 
 const app = express();
 
+
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(helmet({
+  crossOriginResourcePolicy:false,
+}))
 app.use(
   cors({
     origin: process.env.FRONTEND_URL,
     credentials: true,
   }),
 );
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(helmet())
+app.set("trust proxy", 1);
 app.use(globalLimiter)
+app.use(cookieParser());
+
+
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/folder', folderRoutes);
 app.use('/api/v1/file', fileRoutes);

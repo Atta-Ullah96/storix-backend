@@ -1,13 +1,25 @@
 export const SESSION_COOKIE_NAME = 'sessionId';
 export const SESSION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
-export const getSessionExpiryDate = () =>
-  new Date(Date.now() + SESSION_MAX_AGE_MS);
+const isProduction = () => process.env.NODE_ENV === 'production';
+
+const getBooleanEnv = (value, fallback) => {
+  if (value === 'true') {
+    return true;
+  }
+
+  if (value === 'false') {
+    return false;
+  }
+
+  return fallback;
+};
 
 const getSessionCookieOptions = () => ({
   httpOnly: true,
-  sameSite: 'lax',
-  secure: process.env.NODE_ENV === 'production',
+  path: '/',
+  sameSite: process.env.COOKIE_SAME_SITE || (isProduction() ? 'none' : 'lax'),
+  secure: getBooleanEnv(process.env.COOKIE_SECURE, isProduction()),
 });
 
 export const setSessionCookie = (res, sessionId) => {
@@ -22,6 +34,10 @@ export const clearSessionCookie = (res) => {
 };
 
 export const getSessionIdFromRequest = (req) => {
+  if (req.cookies?.[SESSION_COOKIE_NAME]) {
+    return req.cookies[SESSION_COOKIE_NAME];
+  }
+
   const cookieHeader = req.headers.cookie;
 
   if (!cookieHeader) {

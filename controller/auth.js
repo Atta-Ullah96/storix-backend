@@ -10,7 +10,7 @@ import {
   clearSessionCookie,
   getSessionIdFromRequest,
   setSessionCookie,
-} from '../utils/session.js';
+} from '../utils/cookiesHandling.js';
 import { loginSchema } from '../validator/auth.js';
 
 export const register = asyncHandler(async (req, res) => {
@@ -51,7 +51,7 @@ export const login = asyncHandler(async (req, res) => {
   const validateData = loginSchema.parse(req.body);
 
   const { email, password } = validateData;
-  
+
   if (!email || !password) {
     throw new AppError('Email and password are required', 400);
   }
@@ -74,13 +74,13 @@ export const login = asyncHandler(async (req, res) => {
     throw new AppError('Invalid email or password', 401);
   }
 
-  const session = await createOrReuseSession(user._id);
-  setSessionCookie(res, session._id);
+  const { sessionId } = await createOrReuseSession(user._id);
+
+  setSessionCookie(res, sessionId);
 
   res.status(200).json({
     success: true,
     message: 'User logged in successfully',
-    sessionId: session._id,
     user: {
       id: user._id,
       name: user.name,
@@ -128,13 +128,13 @@ export const continueWithGoogle = asyncHandler(async (req, res) => {
     );
   }
 
-  const session = await createOrReuseSession(user._id);
-  setSessionCookie(res, session._id);
+  const { sessionId } = await createOrReuseSession(user._id);
+  setSessionCookie(res, sessionId);
 
   res.status(200).json({
     success: true,
     message: 'User logged in with Google successfully',
-    sessionId: session._id,
+    sessionId,
     user: {
       id: user._id,
       name: user.name,
@@ -145,7 +145,7 @@ export const continueWithGoogle = asyncHandler(async (req, res) => {
 });
 
 export const logout = asyncHandler(async (req, res) => {
-  const sessionId = req.session?._id || getSessionIdFromRequest(req);
+  const sessionId = req.session?.id || getSessionIdFromRequest(req);
 
   await deleteSessionById(sessionId);
 
@@ -172,3 +172,5 @@ export const getCurrentUser = asyncHandler(async (req, res) => {
     },
   });
 });
+
+
