@@ -64,6 +64,46 @@ const authSchema = new mongoose.Schema(
       default: null,
       index: true,
     },
+    subscriptionPlan: {
+      type: String,
+      enum: ['free', 'pro', 'business'],
+      default: 'free',
+      index: true,
+    },
+    subscriptionStatus: {
+      type: String,
+      enum: [
+        'free',
+        'active',
+        'trialing',
+        'past_due',
+        'canceled',
+        'unpaid',
+        'incomplete',
+      ],
+      default: 'free',
+      index: true,
+    },
+    stripeCustomerId: {
+      type: String,
+      default: null,
+      sparse: true,
+      index: true,
+    },
+    stripeSubscriptionId: {
+      type: String,
+      default: null,
+      sparse: true,
+      index: true,
+    },
+    currentPeriodEnd: {
+      type: Date,
+      default: null,
+    },
+    cancelAtPeriodEnd: {
+      type: Boolean,
+      default: false,
+    },
   },
   {
     timestamps: true,
@@ -73,4 +113,3 @@ const authSchema = new mongoose.Schema(
 const Auth = mongoose.model('Auth', authSchema);
 
 export default Auth;
-

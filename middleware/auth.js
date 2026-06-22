@@ -21,7 +21,7 @@ export const requireAuth = asyncHandler(async (req, res, next) => {
   }
 
   const user = await Auth.findById(session.userId).select(
-    'name email avatar provider role status storageUsed storageLimit lastActiveAt',
+    'name email avatar provider role status storageUsed storageLimit lastActiveAt subscriptionPlan subscriptionStatus stripeCustomerId stripeSubscriptionId currentPeriodEnd cancelAtPeriodEnd'
   );
 
   if (!user) {

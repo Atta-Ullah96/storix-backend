@@ -16,6 +16,12 @@ import {
   updateUserStatus,
   updateUserStorageLimit,
 } from '../controller/admin.js';
+import {
+  getPayments,
+  getSubscriptionDetails,
+  getSubscriptions,
+  getSubscriptionStats,
+} from '../controller/billingAdmin.js';
 import { requireAdmin } from '../middleware/admin.js';
 import { requireAuth } from '../middleware/auth.js';
 
@@ -24,6 +30,10 @@ const router = Router();
 router.use(requireAuth, requireAdmin);
 
 router.get('/overview', getOverview);
+router.get('/subscription-stats', getSubscriptionStats);
+router.get('/subscriptions', getSubscriptions);
+router.get('/subscriptions/:id', getSubscriptionDetails);
+router.get('/payments', getPayments);
 router.get('/users', getUsers);
 router.get('/users/:id', getUserDetails);
 router.patch('/users/:id/status', updateUserStatus);
