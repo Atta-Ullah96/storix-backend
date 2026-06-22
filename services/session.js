@@ -31,3 +31,20 @@ export const deleteSessionById = async (sessionId) => {
 
   return redisClient.del(getSessionKey(sessionId));
 };
+
+export const deleteUserSessions = async (userId) => {
+  let deletedCount = 0;
+
+  for await (const key of redisClient.scanIterator({
+    MATCH: `${SESSION_PREFIX}*`,
+    COUNT: 100,
+  })) {
+    const session = await redisClient.json.get(key);
+
+    if (session?.userId === userId.toString()) {
+      deletedCount += await redisClient.del(key);
+    }
+  }
+
+  return deletedCount;
+};

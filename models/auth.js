@@ -48,12 +48,29 @@ const authSchema = new mongoose.Schema(
       type: Number,
       default: 8 * 1024 * 1024 * 1024,
     },
+    role: {
+      type: String,
+      enum: ['user', 'admin'],
+      default: 'user',
+    },
+
+    status: {
+      type: String,
+      enum: ['active', 'blocked'],
+      default: 'active',
+    },
+    lastActiveAt: {
+      type: Date,
+      default: null,
+      index: true,
+    },
   },
   {
     timestamps: true,
-  },
+  }
 );
 
 const Auth = mongoose.model('Auth', authSchema);
 
 export default Auth;
+

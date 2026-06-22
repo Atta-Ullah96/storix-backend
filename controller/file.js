@@ -14,8 +14,6 @@ import {
   findUserFile,
   formatFileResponse,
   getFileExtension,
-  isAllowedFileType,
-  isValidFileSize,
   PREVIEW_ALLOWED_TYPES,
 } from '../utils/file.js';
 import {
@@ -25,10 +23,12 @@ import {
 import Auth from '../models/auth.js';
 import { uploadFileSchema } from '../validator/file.js';
 import { isValidMongoId, isValidOptionalMongoId } from '../utils/isValidMongodbId.js';
+import { getSystemSettings } from '../services/settings.js';
 
 const EIGHT_GB = 8 * 1024 * 1024 * 1024;
 export const requestUpload = asyncHandler(async (req, res) => {
   const { fileName, fileType, fileSize, folderId } = uploadFileSchema.parse(req.body);
+  const settings = await getSystemSettings();
 
     if (!isValidOptionalMongoId(folderId)) {
         throw new AppError('Invalid parent folder id', 400);
@@ -38,11 +38,11 @@ export const requestUpload = asyncHandler(async (req, res) => {
     throw new AppError('File name, type and size are required', 400);
   }
 
-  if (!isAllowedFileType(fileType)) {
+  if (!settings.allowedFileTypes.includes(fileType)) {
     throw new AppError('This file type is not allowed', 400);
   }
 
-  if (!isValidFileSize(fileSize)) {
+  if (Number(fileSize) > settings.maxFileUploadSize) {
     throw new AppError('File size is too large', 400);
   }
   const size = Number(fileSize);
@@ -348,3 +348,4 @@ export const deleteFile = asyncHandler(async (req, res) => {
     message: 'File deleted successfully',
   });
 });
+

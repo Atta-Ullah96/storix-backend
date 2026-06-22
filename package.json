@@ -21,6 +21,7 @@
     "eslint": "^10.4.1",
     "eslint-config-prettier": "^10.1.8",
     "globals": "^17.6.0",
+    "nodemon": "^3.1.14",
     "prettier": "^3.8.3"
   },
   "name": "backend",
@@ -31,7 +32,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "lint": "next lint",
-    "dev": "node --watch index.js"
+    "dev": "node --watch  index.js"
   },
   "keywords": [],
   "author": "",

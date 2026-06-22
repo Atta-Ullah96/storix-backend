@@ -12,8 +12,15 @@ import {
   setSessionCookie,
 } from '../utils/cookiesHandling.js';
 import { loginSchema } from '../validator/auth.js';
+import { getSystemSettings } from '../services/settings.js';
 
 export const register = asyncHandler(async (req, res) => {
+  const settings = await getSystemSettings();
+
+  if (!settings.allowRegistration) {
+    throw new AppError('Registration is currently disabled', 403);
+  }
+
   const { name, email, password } = req.body;
 
   if (!name || !email || !password) {
@@ -104,6 +111,12 @@ export const continueWithGoogle = asyncHandler(async (req, res) => {
   });
 
   if (!user) {
+    const settings = await getSystemSettings();
+
+    if (!settings.allowRegistration) {
+      throw new AppError('Registration is currently disabled', 403);
+    }
+
     user = await Auth.create({
       name: googleUser.name,
       email: googleUser.email,
@@ -111,6 +124,7 @@ export const continueWithGoogle = asyncHandler(async (req, res) => {
       googleId: googleUser.googleId,
       avatar: googleUser.avatar,
       isEmailVerified: true,
+      storageLimit: settings.defaultStorageLimit,
     });
   } else {
     user = await Auth.findByIdAndUpdate(
@@ -169,8 +183,13 @@ export const getCurrentUser = asyncHandler(async (req, res) => {
       name: req.user.name,
       email: req.user.email,
       avatar: req.user.avatar,
+      role: req.user.role
+      
     },
   });
 });
+
+
+
 
 

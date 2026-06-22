@@ -276,3 +276,109 @@ await fetch('http://localhost:4000/api/v1/auth/login', {
 - `FRONTEND_URL` must match your frontend origin exactly.
 - For local development, `secure` cookies are disabled unless `NODE_ENV=production`.
 - For production, use HTTPS and set the correct production frontend URL.
+
+## Admin API
+
+All admin endpoints use the `/api/admin` base path and require a valid `sessionId` cookie for a user whose `role` is `admin`. Unauthenticated requests return `401`; non-admin requests return `403`.
+
+### Bootstrap the first admin
+
+Promote one existing account directly in MongoDB once:
+
+```javascript
+db.auths.updateOne(
+  { email: 'admin@example.com' },
+  { $set: { role: 'admin', status: 'active' } }
+)
+```
+
+Log out and log in again after promotion so the session loads the updated user fields.
+
+### Endpoints
+
+```text
+GET    /api/admin/overview
+GET    /api/admin/users
+GET    /api/admin/users/:id
+PATCH  /api/admin/users/:id/status
+PATCH  /api/admin/users/:id/role
+PATCH  /api/admin/users/:id/storage-limit
+DELETE /api/admin/users/:id
+GET    /api/admin/storage
+GET    /api/admin/files
+GET    /api/admin/files/:id
+DELETE /api/admin/files/:id
+GET    /api/admin/activity
+GET    /api/admin/health
+GET    /api/admin/settings
+PATCH  /api/admin/settings
+```
+
+Users list query parameters:
+
+```text
+page, limit, search, status, role, sort, order
+```
+
+Allowed user sort fields: `createdAt`, `lastActiveAt`, `storageUsed`, `storageLimit`.
+
+Files list query parameters:
+
+```text
+page, limit, search, type, user, sort, order
+```
+
+Allowed file sort fields: `size`, `createdAt`, `uploadedAt`.
+
+Activity query parameters:
+
+```text
+page, limit, search, action, user, status, from, to
+```
+
+Admin action bodies:
+
+```json
+{ "status": "blocked" }
+```
+
+```json
+{ "role": "admin" }
+```
+
+```json
+{ "storageLimit": 17179869184 }
+```
+
+Settings body can contain any of:
+
+```json
+{
+  "defaultStorageLimit": 8589934592,
+  "maxFileUploadSize": 52428800,
+  "allowedFileTypes": ["image/png", "application/pdf"],
+  "storageWarningThreshold": 80,
+  "maintenanceMode": false,
+  "allowRegistration": true
+}
+```
+
+`defaultStorageLimit`, `maxFileUploadSize`, and file type settings are applied to new registrations and uploads. `allowRegistration` applies to local and Google account creation.
+
+### Postman testing
+
+1. Start MongoDB, Redis, and the backend.
+2. Call `POST /api/v1/auth/login` with the admin email/password.
+3. Keep Postman's cookie jar enabled; verify `sessionId` exists for the backend host.
+4. Call `GET /api/admin/overview` using the same host (`localhost` or `127.0.0.1`) used for login.
+5. Test a normal user session against `/api/admin/overview`; it should return `403`.
+6. Test list filters and pagination, then test status/role/quota changes on a non-admin test user.
+7. Use disposable files/users when testing delete endpoints because they delete S3 objects and MongoDB records.
+
+### Admin frontend fields
+
+User tables can consume `avatar`, `role`, `status`, `storageUsed`, `storageLimit`, `usagePercentage`, `filesCount`, `foldersCount`, `createdAt`, and `lastActiveAt`. Admin file rows include populated `owner` and `folder` objects. List APIs return pagination under `data.pagination`.
+
+### Deletion behavior
+
+Admin file deletion removes the S3 object, file metadata, and decrements the owner's recorded storage usage. Admin user deletion is guarded against self-deletion and last-admin deletion; it removes owned S3 objects, file/folder metadata, Redis sessions, and the user record. If any S3 object cannot be deleted, user deletion stops before metadata is removed.

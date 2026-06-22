@@ -1,5 +1,5 @@
 import Auth from '../models/auth.js';
-import { getSession } from '../services/session.js';
+import { deleteSessionById, getSession } from '../services/session.js';
 import {
   clearSessionCookie,
   getSessionIdFromRequest,
@@ -21,13 +21,24 @@ export const requireAuth = asyncHandler(async (req, res, next) => {
   }
 
   const user = await Auth.findById(session.userId).select(
-    'name email avatar provider storageUsed storageLimit',
+    'name email avatar provider role status storageUsed storageLimit lastActiveAt',
   );
 
   if (!user) {
+    await deleteSessionById(sessionId);
     clearSessionCookie(res);
     throw new AppError('Session user not found', 401);
   }
+
+  if (user.status === 'blocked') {
+    await deleteSessionById(sessionId);
+    clearSessionCookie(res);
+    throw new AppError('Your account has been blocked', 403);
+  }
+
+  const now = new Date();
+  user.lastActiveAt = now;
+  await Auth.updateOne({ _id: user._id }, { $set: { lastActiveAt: now } });
 
   req.session = {
     id: sessionId,
