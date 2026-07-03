@@ -42,7 +42,7 @@ app.use('/api/v1/folder', folderRoutes);
 app.use('/api/v1/file', fileRoutes);
 app.use('/api/v1/user', userRoutes);
 app.use('/api/billing', billingRoutes);
-app.use('/api/admin', adminRoutes);
+app.use('/api/admin', adminRoutes); 
 
 app.get('/', (_req, res) => {
   res.status(200).json({
